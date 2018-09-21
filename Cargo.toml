@@ -1,0 +1,13 @@
+[package]
+name = "zuvio_mark"
+version = "0.1.0"
+authors = ["CRoot <croot@xcroot.com>"]
+
+[dependencies]
+reqwest = "0.9.0"
+serde_json = "1.0.28"
+failure = "0.1.2"
+serde = "1.0.79"
+serde_derive = "1.0.79"
+rand = "0.5.5"
+clap = {version = "~2.27.0", features = ["yaml"]}

@@ -1,0 +1,9 @@
+name: ZuvioMark
+version: "1.0"
+author: CRoot <croot@xcroot.com>
+about: Auto mark in Zuvio.
+subcommands:
+  - init:
+      about: Generate app config file
+  - run:
+      about: Start check mark and do it
