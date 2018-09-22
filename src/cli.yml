@@ -1,7 +1,7 @@
-name: ZuvioMark
-version: "1.0"
+name: zuvio_mark
+version: "0.1.20180922"
 author: CRoot <croot@xcroot.com>
-about: Auto mark in Zuvio.
+about: Auto mark in Zuvio. When you first ues this, you must be use init command to init env in your computer, then edit the `config.json`, add your `user_id` and `access_token`. last use run command to listen the mark.
 subcommands:
   - init:
       about: Generate app config file

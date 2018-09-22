@@ -1,6 +1,6 @@
 [package]
 name = "zuvio_mark"
-version = "0.1.0"
+version = "0.1.20180922"
 authors = ["CRoot <croot@xcroot.com>"]
 
 [dependencies]
