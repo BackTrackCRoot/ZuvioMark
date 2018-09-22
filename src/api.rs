@@ -2,46 +2,54 @@ use failure::Error;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
 use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Api {
     client: Client,
-    user_info: HashMap<String, String>,
+    user_info: UserInfo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default, Debug)]
+pub struct UserInfo {
+    pub user_id: String,
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RollCall {
-    user_id: String,
-    #[serde(rename = "accessToken")]
-    access_token: String,
-    course_id: i32,
+    #[serde(flatten)]
+    user_info: UserInfo,
+    course_id: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct MarkRollCall {
-    user_id: String,
-    #[serde(rename = "accessToken")]
-    access_token: String,
-    rollcall_id: i32,
+    #[serde(flatten)]
+    user_info: UserInfo,
+    rollcall_id: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Course {
+    pub course_id: u32,
+    pub name: String,
 }
 
 impl Api {
-    pub fn new(user_id: String, access_token: String) -> Self {
-        let mut map: HashMap<String, String> = HashMap::new();
-        map.insert("user_id".to_string(), user_id);
-        map.insert("accessToken".to_string(), access_token);
-        Api {
-            client: Client::builder().timeout(None).build().unwrap(),
-            user_info: map,
-        }
+    pub fn new(user_info: UserInfo) -> Self {
+        let client = Client::builder().timeout(None).build().unwrap();
+
+        Api { client, user_info }
     }
+
     fn headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers
     }
-    pub fn get_courses(&self) -> Result<HashMap<String, String>, Error> {
+
+    pub fn get_courses(&self) -> Result<Vec<Course>, Error> {
         let res = self
             .client
             .post("http://cty.zuvio.com.cn/index.php/app_v2/getCourseList")
@@ -49,26 +57,23 @@ impl Api {
             .json(&self.user_info)
             .send()?
             .text()?;
+
         let ret_json: Value = serde_json::from_str(&res)?;
-        let courses = match ret_json["semesters"][0]["courses"].as_array() {
-            Some(c) => c,
-            None => return Err(format_err!("{}", ret_json["msg"])),
-        };
-        let mut ret_map: HashMap<String, String> = HashMap::new();
-        for i in courses {
-            let courses: Value = serde_json::from_str(&i.to_string())?;
-            ret_map.insert(
-                courses["course_id"].to_string().replace("\"", ""),
-                courses["name"].to_string().replace("\"", ""),
-            );
+        let courses_json = &ret_json["semesters"][0]["courses"];
+
+        if courses_json.is_null() {
+            return Err(format_err!("{}", ret_json["msg"]));
         }
-        Ok(ret_map)
+
+        let courese: Vec<Course> = serde_json::from_value(courses_json.clone())?;
+
+        Ok(courese)
     }
-    pub fn get_rollcall(&self, course_id: String) -> Result<Option<String>, Error> {
+
+    pub fn get_rollcall(&self, course_id: u32) -> Result<Option<u32>, Error> {
         let post_data = RollCall {
-            user_id: self.user_info.get("user_id").unwrap().to_string(),
-            access_token: self.user_info.get("accessToken").unwrap().to_string(),
-            course_id: course_id.parse().unwrap(),
+            user_info: self.user_info.clone(),
+            course_id,
         };
 
         let res = self
@@ -78,22 +83,26 @@ impl Api {
             .json(&post_data)
             .send()?
             .text()?;
+
         let ret_json: Value = serde_json::from_str(&res)?;
-        match ret_json.get("rollcall") {
-            Some(rc) => {
-                if *rc != Value::Null && rc["record"]["answered"] == false {
-                    return Ok(Some(rc["id"].to_string().replace("\"", "")));
-                }
-            }
-            None => return Err(format_err!("{}", "Not found rollcall!")),
+        let rollcall = ret_json
+            .get("rollcall")
+            .ok_or_else(|| format_err!("Not found rollcall!"))?;
+        let answered = rollcall["record"]["answered"]
+            .as_bool()
+            .ok_or_else(|| format_err!("Not found answered!"))?;
+
+        if !answered {
+            Ok(Some(rollcall["id"].as_u64().unwrap() as u32))
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
-    pub fn mark_rollcall(&self, rollcall_id: String) -> Result<bool, Error> {
+
+    pub fn mark_rollcall(&self, rollcall_id: u32) -> Result<bool, Error> {
         let post_data = MarkRollCall {
-            user_id: self.user_info.get("user_id").unwrap().to_string(),
-            access_token: self.user_info.get("accessToken").unwrap().to_string(),
-            rollcall_id: rollcall_id.parse().unwrap(),
+            user_info: self.user_info.clone(),
+            rollcall_id,
         };
 
         let res = self
@@ -103,11 +112,10 @@ impl Api {
             .json(&post_data)
             .send()?
             .text()?;
+
         let ret_json: Value = serde_json::from_str(&res)?;
         println!("{:?}", ret_json);
-        match ret_json["status"].as_bool() {
-            Some(status) => Ok(status),
-            None => Ok(false),
-        }
+
+        Ok(ret_json["status"].as_bool().unwrap_or(false))
     }
 }

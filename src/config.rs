@@ -1,26 +1,25 @@
+use std::fs::File;
+
 use failure::Error;
 use serde_json;
-use std::fs::{self, File};
-use std::path::Path;
+
+use crate::api::UserInfo;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct UserConfig {
-    pub user_id: String,
-    pub access_token: String,
+    #[serde(flatten)]
+    pub user_info: UserInfo,
 }
 
 impl UserConfig {
     pub fn gnerate_config(&self) -> Result<(), Error> {
-        let path = Path::new("./config.json");
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let mut file = File::create(Path::new("./config.json"))?;
+        let mut file = File::create("./config.json")?;
         serde_json::to_writer_pretty(&mut file, self)?;
         Ok(())
     }
-    pub fn load_config(&self) -> Result<Self, Error> {
-        let file = File::open(Path::new("./config.json"))?;
+
+    pub fn load_config() -> Result<Self, Error> {
+        let file = File::open("./config.json")?;
         Ok(serde_json::from_reader(&file)?)
     }
 }
