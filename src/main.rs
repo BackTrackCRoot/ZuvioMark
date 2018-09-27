@@ -57,8 +57,7 @@ fn run() -> Result<(), Error> {
                 UserConfig::load_config().expect("Config file is error,please reinit it !");
 
             let api = Api::new(config_info.user_info);
-
-            println!("{}", "正在检测签到课程...");
+            println!("正在检测签到课程...");
             loop {
                 let courses = api.get_courses()?;
 
@@ -68,10 +67,11 @@ fn run() -> Result<(), Error> {
                         println!("{} 课程有签到！准备开始签到 ...", &course.name);
 
                         let status = api.mark_rollcall(rollcall_id)?;
-                        if status == true {
-                            print!("{}", "签到成功！");
+                        //println!("{:?}",&status);
+                        if status {
+                            println!("签到成功！");
                         } else {
-                            print!("{}", "签到失败！");
+                            println!("签到失败！");
                         }
                     }
                 }

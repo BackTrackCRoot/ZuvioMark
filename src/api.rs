@@ -1,7 +1,10 @@
 use failure::Error;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use serde::de::{self, Deserialize, Deserializer};
 use serde_json::Value;
+use std::fmt::Display;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Api {
@@ -32,6 +35,7 @@ struct MarkRollCall {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Course {
+    #[serde(deserialize_with = "from_str")]
     pub course_id: u32,
     pub name: String,
 }
@@ -66,7 +70,7 @@ impl Api {
         }
 
         let courese: Vec<Course> = serde_json::from_value(courses_json.clone())?;
-
+        //println!("{:?}",courese);
         Ok(courese)
     }
 
@@ -75,7 +79,6 @@ impl Api {
             user_info: self.user_info.clone(),
             course_id,
         };
-
         let res = self
             .client
             .post("http://cty.zuvio.com.cn/index.php/app_v2/getRollcall")
@@ -85,15 +88,21 @@ impl Api {
             .text()?;
 
         let ret_json: Value = serde_json::from_str(&res)?;
+        //println!("{:?}",ret_json);
         let rollcall = ret_json
             .get("rollcall")
             .ok_or_else(|| format_err!("Not found rollcall!"))?;
-        let answered = rollcall["record"]["answered"]
-            .as_bool()
-            .ok_or_else(|| format_err!("Not found answered!"))?;
 
-        if !answered {
-            Ok(Some(rollcall["id"].as_u64().unwrap() as u32))
+        if !rollcall.is_null() {
+            let answered = rollcall["record"]["answered"]
+                .as_bool()
+                .ok_or_else(|| format_err!("Not found answered!"))?;
+            if !answered {
+                //println!("{:?}",rollcall["id"].as_str().unwrap().parse::<u32>());
+                Ok(Some(rollcall["id"].as_str().unwrap().parse()?))
+            } else {
+                Ok(None)
+            }
         } else {
             Ok(None)
         }
@@ -114,8 +123,18 @@ impl Api {
             .text()?;
 
         let ret_json: Value = serde_json::from_str(&res)?;
-        println!("{:?}", ret_json);
+        //println!("{:?}", ret_json);
 
         Ok(ret_json["status"].as_bool().unwrap_or(false))
     }
+}
+
+fn from_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: FromStr,
+    T::Err: Display,
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    T::from_str(&s).map_err(de::Error::custom)
 }
