@@ -1,6 +1,3 @@
-#![feature(crate_in_paths)]
-#![feature(extern_prelude)]
-
 extern crate reqwest;
 extern crate serde_json;
 #[macro_use]
